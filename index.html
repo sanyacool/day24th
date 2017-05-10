@@ -1,0 +1,145 @@
+<!doctype html>
+<html>
+  <head>
+    <script src="https://code.createjs.com/createjs-2015.11.26.min.js"> </script>
+    <script src="https://code.createjs.com/easeljs-0.8.0.min.js"> </script>
+    <script src="https://code.createjs.com/tweenjs-0.6.2.min.js"> </script>
+    <script src="https://cdn.socket.io/socket.io-1.2.0.js"> </script>
+    <title>Canvas Animation</title>
+    <style>
+      #canvas {border: solid 1px black; cursor:none;}
+    </style>
+  </head> 
+  <body>
+    <canvas id="canvas"></canvas><br>
+    <script >
+		var socket = io();
+		
+		stage = new createjs.Stage("canvas");
+		canvas = document.querySelector('canvas');
+		canvas.width = window.innerWidth - 50;
+		canvas.height = window.innerHeight - 50;
+		var circle;
+		var mouseX;
+		var mouseY;
+		var pointSheet = new createjs.SpriteSheet({
+				images: ["/my"],
+				frames: {width: 38, height: 38}
+		});
+		point = new createjs.Sprite(pointSheet, 1);
+		stage.addChild(point);
+		point.x = 0;
+		point.y = 0;
+		var points = {
+			x: point.x,
+			y: point.y
+		};
+		
+		socket.on('user connected', function(UserId){
+			circle = new createjs.Shape();
+			
+			let radius = RandomNumb(20, 50);
+			let color = 'rgba(' + RandomNumb(0,255) + ',' + RandomNumb(0,255) + ',' + RandomNumb(0,255) + ',1)';
+			circle.graphics.beginFill(color).drawCircle(0, 0, radius);
+			stage.addChild(circle);
+			
+			circle.x = RandomNumb(50,canvas.width - 50);
+			circle.y = RandomNumb(50,canvas.height - 50);
+
+			stage.update;
+			socket.emit('connection done', circle.x, circle.y, color, radius, UserId, mouseX, mouseY);
+		});
+		
+		socket.on('user done', function(coordx, coordy, plcol, plrad, userid, mouseX, mouseY){
+			CreateCircle(coordx, coordy, plcol, plrad, userid);
+			CreatePoint(mouseX, mouseY, userid);
+		});
+
+		socket.on('show other', function(users){
+			for(user in users){
+				CreateCircle(users[user].x, users[user].y, users[user].col, users[user].rad, user);
+				CreatePoint(users[user].msX, users[user].msY, user);
+			}       
+		});
+
+		socket.on('user disconnected', function(UserId){
+			stage.removeChild(window[UserId]);
+			stage.removeChild(points[UserId]);
+		});
+				
+		stage.on("stagemousemove", function(evt) {
+			mouseX = evt.stageX;
+			mouseY = evt.stageY;
+			createjs.Tween
+				.get(point, { loop: false })
+				.to({ x: evt.stageX - 19, y: evt.stageY - 19 }, 1);
+			createjs.Tween
+				.get(circle)
+				.to({ x: circle.x + ((evt.stageX - circle.x)/10) , y: circle.y + ((evt.stageY - circle.y)/10)}, 100);
+			socket.emit('moving done', circle.x, circle.y, evt.stageX, evt.stageY);
+		});
+		
+		socket.on('moving done', function(coordx,coordy, userid){
+				window[userid].x = coordx;
+				window[userid].y = coordy;
+		});
+		
+		createjs.Ticker.addEventListener("tick", handleTick);
+		function handleTick(event) {
+			socket.emit('moving point', mouseX, mouseY); 
+			stage.update();
+		}
+		
+		socket.on('moving point', function(mX, mY, UserId){
+		console.log('mX ' + mX + ' mY: ' + mY);
+			points[UserId].x = mX;
+			points[UserId].y = mY;
+		});
+		
+		createjs.Ticker.setFPS(60);
+		createjs.Ticker.addEventListener("tick", stage);
+			
+		function onTickHandler(evt) {  
+			
+        };
+		
+        window.addEventListener('resize', onResize, false);
+        onResize();
+        function onResize() {
+			canvas.width = window.innerWidth;
+			canvas.height = window.innerHeight;
+        };
+		
+		function RandomNumb(min, max){
+			return Math.random() * (max - min) + min;
+		}	
+		
+		function CreateCircle(X,Y,col,rad,Id){
+			var circle = new createjs.Shape();
+			circle.graphics.beginFill(col).drawCircle(0, 0, rad);
+			window[Id] = circle;
+			stage.addChild(window[Id]);
+			window[Id].x = X;
+			window[Id].y = Y;
+			stage.update;
+		};
+		
+		function CreatePoint(mX,mY,Id){
+			console.log(mX);
+			let pointSheet = new createjs.SpriteSheet({
+				images: ["/other"],
+				frames: {width: 38, height: 38}
+			});
+			let point = new createjs.Sprite(pointSheet, 1);
+			points[Id] = point;
+			stage.addChild(points[Id]);
+			points[Id].x = mX;
+			points[Id].y = mY;
+		};
+    </script>
+  </body>
+</html>
+
+
+
+
